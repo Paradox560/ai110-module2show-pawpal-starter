@@ -2,6 +2,61 @@
 
 ## 1. System Design
 
+**Three core user actions:**
+
+1. **Add a pet and owner info** — The user enters their name, daily time available, and preferences, then registers their pet (name, breed, age, special needs).
+2. **Add and edit care tasks** — The user creates tasks like walks, feeding, or medication, each with a duration and priority level.
+3. **Generate a daily plan** — The user requests a scheduled plan; the system fits tasks into available time slots ranked by priority and explains the reasoning.
+
+**Mermaid.js Class Diagram:**
+
+```mermaid
+classDiagram
+    class Owner {
+        +str name
+        +int available_minutes
+        +list preferences
+        +Pet pet
+        +add_pet(pet: Pet)
+        +get_available_time() int
+    }
+
+    class Pet {
+        +str name
+        +str breed
+        +int age
+        +list special_needs
+        +list tasks
+        +add_task(task: Task)
+        +get_tasks() list
+    }
+
+    class Task {
+        +str name
+        +int duration_minutes
+        +int priority
+        +str category
+        +str preferred_time
+        +get_priority_score() int
+        +is_schedulable(available: int) bool
+    }
+
+    class Scheduler {
+        +Owner owner
+        +list tasks
+        +int total_minutes
+        +generate_plan() list
+        +filter_by_time(minutes: int) list
+        +sort_by_priority(tasks: list) list
+        +explain_plan(plan: list) str
+    }
+
+    Owner "1" --> "1" Pet : owns
+    Pet "1" --> "*" Task : has
+    Scheduler "1" --> "1" Owner : uses
+    Scheduler "1" --> "*" Task : schedules
+```
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.
