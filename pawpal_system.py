@@ -39,6 +39,20 @@ class Task:
         self.completed = False
         self.pet_name = None              # set automatically by Pet.add_task()
 
+    @property
+    def priority_label(self) -> str:
+        """Return a human-readable priority label: Low (1-2), Medium (3), High (4-5)."""
+        if self.priority >= 4:
+            return "High"
+        if self.priority == 3:
+            return "Medium"
+        return "Low"
+
+    @property
+    def priority_emoji(self) -> str:
+        """Return a color-dot emoji for the task's priority level."""
+        return {"High": "🔴", "Medium": "🟡", "Low": "🟢"}[self.priority_label]
+
     def get_priority_score(self) -> int:
         """Return the numeric priority of this task."""
         return self.priority
@@ -240,6 +254,17 @@ class Scheduler:
     def sort_by_priority(self, tasks: list[Task]) -> list[Task]:
         """Return tasks sorted from highest to lowest priority score."""
         return sorted(tasks, key=lambda t: t.get_priority_score(), reverse=True)
+
+    def sort_by_priority_then_time(self, tasks: list[Task]) -> list[Task]:
+        """Sort tasks by priority descending, then by time-of-day slot ascending.
+
+        High-priority tasks appear first; within the same priority level tasks
+        are ordered morning → afternoon → evening → anytime.
+        """
+        return sorted(
+            tasks,
+            key=lambda t: (-t.get_priority_score(), _TIME_ORDER.get(t.preferred_time, 99)),
+        )
 
     def sort_by_time(self, tasks: list[Task]) -> list[Task]:
         """Return tasks sorted by preferred_time (morning → afternoon → evening → anytime).

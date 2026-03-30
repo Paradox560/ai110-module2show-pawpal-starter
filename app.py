@@ -83,19 +83,19 @@ else:
         _save()
         st.success(f"Added '{task_title}' to {selected_pet}.")
 
-    # Show current tasks sorted by time of day
+    # Show current tasks sorted by priority then time of day
     all_tasks = st.session_state.owner.get_all_tasks()
     if all_tasks:
         scheduler = Scheduler(st.session_state.owner)
-        sorted_tasks = scheduler.sort_by_time(all_tasks)
-        st.markdown("**Current tasks (sorted by time of day):**")
+        sorted_tasks = scheduler.sort_by_priority_then_time(all_tasks)
+        st.markdown("**Current tasks (priority → time of day):**")
         rows = [
             {
+                "Priority": f"{t.priority_emoji} {t.priority_label}",
                 "Pet": t.pet_name or "—",
                 "Task": t.name,
                 "Time": (t.time if t.time else t.preferred_time),
                 "Duration (min)": t.duration_minutes,
-                "Priority": t.priority,
                 "Category": t.category,
                 "Frequency": t.frequency,
                 "Done": "✓" if t.completed else "",
@@ -137,15 +137,15 @@ else:
             else:
                 st.success(f"Schedule ready — {sum(t.duration_minutes for t in plan)} of {owner.available_minutes} minutes used.")
 
-                # Sort plan by time of day for display
-                sorted_plan = scheduler.sort_by_time(plan)
+                # Sort plan by priority then time of day for display
+                sorted_plan = scheduler.sort_by_priority_then_time(plan)
                 plan_rows = [
                     {
+                        "Priority": f"{t.priority_emoji} {t.priority_label}",
                         "Pet": t.pet_name or "—",
                         "Task": t.name,
                         "Time": (t.time if t.time else t.preferred_time),
                         "Duration (min)": t.duration_minutes,
-                        "Priority": t.priority,
                         "Frequency": t.frequency,
                     }
                     for t in sorted_plan
@@ -204,16 +204,16 @@ else:
     pet_arg = None if filter_pet == "All" else filter_pet
 
     filtered = scheduler.filter_tasks(completed=completed_arg, pet_name=pet_arg)
-    filtered_sorted = scheduler.sort_by_time(filtered)
+    filtered_sorted = scheduler.sort_by_priority_then_time(filtered)
 
     if filtered_sorted:
         rows = [
             {
+                "Priority": f"{t.priority_emoji} {t.priority_label}",
                 "Pet": t.pet_name or "—",
                 "Task": t.name,
                 "Time": (t.time if t.time else t.preferred_time),
                 "Duration (min)": t.duration_minutes,
-                "Priority": t.priority,
                 "Frequency": t.frequency,
                 "Done": "✓" if t.completed else "",
             }
