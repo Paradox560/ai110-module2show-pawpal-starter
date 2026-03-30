@@ -3,17 +3,28 @@ PawPal+ Logic Layer
 Backend classes for pet care scheduling.
 """
 
+from datetime import date, timedelta
+
+# Maps preferred_time strings to sort order (morning first, anytime last)
+_TIME_ORDER = {"morning": 0, "afternoon": 1, "evening": 2, "anytime": 3}
+
 
 class Task:
     """Represents a single pet care activity with duration, priority, and completion state."""
 
-    def __init__(self, name: str, duration_minutes: int, priority: int, category: str, preferred_time: str = "anytime"):
+    def __init__(self, name: str, duration_minutes: int, priority: int, category: str,
+                 preferred_time: str = "anytime", frequency: str = "once",
+                 time: str = None, due_date: date = None):
         self.name = name
         self.duration_minutes = duration_minutes
         self.priority = priority          # 1 (low) to 5 (high)
         self.category = category          # e.g. "walk", "feeding", "medication"
-        self.preferred_time = preferred_time  # e.g. "morning", "evening", "anytime"
+        self.preferred_time = preferred_time  # "morning", "afternoon", "evening", "anytime"
+        self.frequency = frequency        # "once", "daily", "weekly"
+        self.time = time                  # exact time string, e.g. "08:00" (used for conflict detection)
+        self.due_date = due_date or date.today()
         self.completed = False
+        self.pet_name = None              # set automatically by Pet.add_task()
 
     def get_priority_score(self) -> int:
         """Return the numeric priority of this task."""
@@ -23,14 +34,43 @@ class Task:
         """Return True if this task's duration fits within the given available minutes."""
         return self.duration_minutes <= available_minutes
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed."""
+    def mark_complete(self) -> "Task | None":
+        """Mark this task as completed.
+
+        For recurring tasks (daily or weekly), creates and returns a new Task
+        instance scheduled for the next occurrence. Returns None for one-time tasks.
+        """
         self.completed = True
+        if self.frequency == "daily":
+            next_task = self._clone_for_date(self.due_date + timedelta(days=1))
+            return next_task
+        if self.frequency == "weekly":
+            next_task = self._clone_for_date(self.due_date + timedelta(weeks=1))
+            return next_task
+        return None
+
+    def _clone_for_date(self, new_due: date) -> "Task":
+        """Return a fresh, incomplete copy of this task with an updated due date."""
+        clone = Task(
+            name=self.name,
+            duration_minutes=self.duration_minutes,
+            priority=self.priority,
+            category=self.category,
+            preferred_time=self.preferred_time,
+            frequency=self.frequency,
+            time=self.time,
+            due_date=new_due,
+        )
+        clone.pet_name = self.pet_name
+        return clone
 
     def __repr__(self) -> str:
         """Return a readable string representation of the task."""
         status = "done" if self.completed else "pending"
-        return f"[{self.preferred_time}] {self.name} ({self.duration_minutes} min, priority {self.priority}) [{status}]"
+        time_str = f" @ {self.time}" if self.time else ""
+        freq_str = f" [{self.frequency}]" if self.frequency != "once" else ""
+        return (f"[{self.preferred_time}{time_str}] {self.name} "
+                f"({self.duration_minutes} min, priority {self.priority}){freq_str} [{status}]")
 
 
 class Pet:
@@ -44,7 +84,8 @@ class Pet:
         self.tasks: list[Task] = []
 
     def add_task(self, task: Task) -> None:
-        """Append a Task to this pet's task list."""
+        """Append a Task to this pet's task list and tag it with this pet's name."""
+        task.pet_name = self.name
         self.tasks.append(task)
 
     def get_tasks(self) -> list[Task]:
@@ -76,6 +117,13 @@ class Owner:
             all_tasks.extend(pet.get_tasks())
         return all_tasks
 
+    def get_pet(self, name: str) -> "Pet | None":
+        """Return the Pet with the given name, or None if not found."""
+        for pet in self.pets:
+            if pet.name == name:
+                return pet
+        return None
+
 
 class Scheduler:
     """Generates a prioritized daily care plan that fits within the owner's available time."""
@@ -91,6 +139,69 @@ class Scheduler:
     def sort_by_priority(self, tasks: list[Task]) -> list[Task]:
         """Return tasks sorted from highest to lowest priority score."""
         return sorted(tasks, key=lambda t: t.get_priority_score(), reverse=True)
+
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Return tasks sorted by preferred_time (morning → afternoon → evening → anytime).
+
+        Tasks sharing the same time-of-day slot are then sorted by priority descending
+        so the most important task within a slot appears first.
+        """
+        return sorted(
+            tasks,
+            key=lambda t: (_TIME_ORDER.get(t.preferred_time, 99), -t.priority),
+        )
+
+    def filter_tasks(self, completed: bool = None, pet_name: str = None) -> list[Task]:
+        """Return tasks optionally filtered by completion status and/or pet name.
+
+        Args:
+            completed: If True, return only completed tasks. If False, return only
+                       pending tasks. If None (default), no completion filter is applied.
+            pet_name:  If provided, return only tasks belonging to this pet.
+                       If None (default), tasks from all pets are included.
+        """
+        tasks = self.owner.get_all_tasks()
+        if completed is not None:
+            tasks = [t for t in tasks if t.completed == completed]
+        if pet_name is not None:
+            tasks = [t for t in tasks if t.pet_name == pet_name]
+        return tasks
+
+    def detect_conflicts(self) -> list[str]:
+        """Detect tasks scheduled at the exact same time and return warning messages.
+
+        Only considers tasks that have an explicit time string (e.g. "09:00").
+        Returns a list of warning strings — one per conflict pair — rather than
+        raising an exception, so the rest of the schedule is unaffected.
+        """
+        warnings: list[str] = []
+        timed_tasks = [t for t in self.owner.get_all_tasks() if t.time is not None and not t.completed]
+        seen: dict[str, Task] = {}
+        for task in timed_tasks:
+            if task.time in seen:
+                other = seen[task.time]
+                warnings.append(
+                    f"CONFLICT: '{task.name}' ({task.pet_name or '?'}) and "
+                    f"'{other.name}' ({other.pet_name or '?'}) are both scheduled at {task.time}."
+                )
+            else:
+                seen[task.time] = task
+        return warnings
+
+    def mark_task_complete(self, task: Task, pet: Pet) -> "Task | None":
+        """Mark a task complete and, if recurring, add the next occurrence to the pet's list.
+
+        Args:
+            task: The Task to complete.
+            pet:  The Pet that owns the task (needed to attach the next occurrence).
+
+        Returns:
+            The newly created next-occurrence Task, or None for one-time tasks.
+        """
+        next_task = task.mark_complete()
+        if next_task is not None:
+            pet.add_task(next_task)
+        return next_task
 
     def generate_plan(self) -> list[Task]:
         """Build and return an ordered plan of tasks that fit within available time."""

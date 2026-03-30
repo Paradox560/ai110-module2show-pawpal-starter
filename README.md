@@ -32,6 +32,15 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Smarter Scheduling
+
+Phase 4 adds three new capabilities to the scheduler:
+
+- **Sort by time of day** — `Scheduler.sort_by_time()` orders any task list by preferred time slot (morning → afternoon → evening → anytime), with priority as a tiebreaker within each slot.
+- **Flexible filtering** — `Scheduler.filter_tasks(completed, pet_name)` lets you retrieve only pending or completed tasks, optionally scoped to a single pet.
+- **Recurring tasks** — Tasks now have a `frequency` field (`"once"`, `"daily"`, `"weekly"`). Calling `Scheduler.mark_task_complete(task, pet)` marks the task done and automatically appends the next occurrence (with the correct due date) to the pet's task list.
+- **Conflict detection** — `Scheduler.detect_conflicts()` scans tasks for exact time-string collisions (e.g., two tasks both set to `"07:30"`) and returns human-readable warning messages without crashing the program.
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.

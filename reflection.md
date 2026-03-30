@@ -87,8 +87,9 @@ Yes — one change was made after reviewing the design for bottlenecks.
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The conflict detector only flags tasks whose `time` strings match exactly (e.g., both set to `"07:30"`). It does **not** check for overlapping durations — for instance, a 30-minute task at `"07:00"` and a 10-minute task at `"07:15"` would never be flagged even though they overlap in real life.
+
+This is a reasonable tradeoff for a lightweight daily planner. Requiring exact-match detection keeps the algorithm O(n) with a single dictionary pass and avoids false positives for tasks that are merely in the same rough time window. For most pet-care tasks, the owner already knows approximate slot boundaries, so an exact-time clash is the most actionable signal to surface. A full overlap check would need start/end times for every task, adding complexity and more required data from the user.
 
 ---
 
