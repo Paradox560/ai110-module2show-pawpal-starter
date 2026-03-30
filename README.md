@@ -43,6 +43,31 @@ pip install -r requirements.txt
 | **Conflict detection** | `Scheduler.detect_conflicts()` flags any two pending tasks that share the same exact time string (e.g., `"08:00"`), returning warning messages without crashing the app. |
 | **Explanatory plan output** | `Scheduler.explain_plan()` produces a plain-English summary of what was scheduled and what was skipped, and why. |
 
+## Challenge: Weighted Scheduling
+
+Beyond basic priority ranking, PawPal+ includes a **composite weighted scoring** algorithm (`Task.compute_weighted_score()` + `Scheduler.generate_weighted_plan()`) that factors in four signals simultaneously:
+
+| Signal | Points | Reasoning |
+|---|---|---|
+| User priority × 10 | 10–50 | Preserves the owner's explicit intent |
+| Category urgency | 0–30 | Medication (30) > feeding (20) > hygiene (15) > walk (10) > grooming/enrichment (5) |
+| Overdue bonus | +25 | Any task past its due date gets bumped regardless of priority |
+| Recurrence bonus | +3–5 | Daily habits outrank one-time tasks at the same score level |
+
+This means an overdue priority-3 medication (score: 30 + 30 + 25 = 85) correctly outranks a non-urgent priority-4 grooming session (score: 40 + 5 = 45) in the final plan — something raw priority sorting cannot achieve.
+
+### How Agent Mode was used to implement this
+
+Agent Mode (Claude Code) was given a single instruction in `steps.txt`: *"Add a third algorithmic capability (like 'next available slot', weighted prioritization, etc.) that goes beyond the basic requirements."*
+
+The agent:
+1. **Read the existing codebase** (`pawpal_system.py`, `tests/test_pawpal.py`, `README.md`) to understand what algorithms already existed before proposing anything new.
+2. **Designed the scoring formula** — it identified that raw priority alone cannot differentiate between a skipped medication and an optional grooming session, and proposed a multi-signal weighted score to address that gap.
+3. **Implemented in layers** — added `_CATEGORY_WEIGHT` constants first, then `compute_weighted_score()` on `Task`, then `generate_weighted_plan()` on `Scheduler`, keeping each change small and reviewable.
+4. **Wrote three targeted tests** covering: category weight difference, overdue bonus value, and an end-to-end case where a lower-priority overdue task correctly beats a higher-priority non-urgent one.
+
+Key prompt that worked well: providing a structured `steps.txt` file with explicit, bounded tasks rather than open-ended instructions. This prevented the agent from over-engineering or going off course.
+
 ## Smarter Scheduling
 
 Phase 4 adds three new capabilities to the scheduler:

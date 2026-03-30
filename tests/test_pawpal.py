@@ -159,6 +159,46 @@ def test_detect_conflicts_no_false_positives():
     assert warnings == []
 
 
+def test_weighted_score_medication_beats_same_priority_grooming():
+    """Medication should outscore grooming at the same priority due to category weight."""
+    med = Task(name="Give Pill", duration_minutes=5, priority=3, category="medication")
+    groom = Task(name="Brush Coat", duration_minutes=10, priority=3, category="grooming")
+    assert med.compute_weighted_score() > groom.compute_weighted_score()
+
+
+def test_weighted_score_overdue_bonus_applied():
+    """An overdue task should receive a +25 bonus on top of its base score."""
+    from datetime import date, timedelta
+    yesterday = date.today() - timedelta(days=1)
+    overdue = Task(name="Vet Visit", duration_minutes=60, priority=2, category="walk", due_date=yesterday)
+    normal  = Task(name="Walk",      duration_minutes=30, priority=2, category="walk")
+    assert overdue.compute_weighted_score() == normal.compute_weighted_score() + 25
+
+
+def test_generate_weighted_plan_prefers_medication_over_higher_raw_priority():
+    """An overdue medication (priority 3) should appear before grooming (priority 4) in weighted plan."""
+    from datetime import date, timedelta
+    owner = Owner(name="Alex", available_minutes=60)
+    pet = Pet(name="Buddy", breed="Labrador", age=3)
+    owner.add_pet(pet)
+
+    overdue_med = Task(
+        name="Overdue Pill",
+        duration_minutes=5,
+        priority=3,
+        category="medication",
+        due_date=date.today() - timedelta(days=1),
+    )
+    groom = Task(name="Grooming", duration_minutes=20, priority=4, category="grooming")
+    pet.add_task(overdue_med)
+    pet.add_task(groom)
+
+    scheduler = Scheduler(owner)
+    plan = scheduler.generate_weighted_plan()
+
+    assert plan[0].name == "Overdue Pill"
+
+
 def test_detect_conflicts_ignores_completed_tasks():
     """Completed tasks should not be considered in conflict detection."""
     owner = Owner(name="Jordan", available_minutes=120)

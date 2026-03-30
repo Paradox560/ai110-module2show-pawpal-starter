@@ -8,6 +8,17 @@ from datetime import date, timedelta
 # Maps preferred_time strings to sort order (morning first, anytime last)
 _TIME_ORDER = {"morning": 0, "afternoon": 1, "evening": 2, "anytime": 3}
 
+# Urgency bonus added to a task's weighted score based on its category.
+# Medication and feeding are safety-critical; grooming/enrichment are discretionary.
+_CATEGORY_WEIGHT = {
+    "medication": 30,
+    "feeding":    20,
+    "hygiene":    15,
+    "walk":       10,
+    "grooming":    5,
+    "enrichment":  5,
+}
+
 
 class Task:
     """Represents a single pet care activity with duration, priority, and completion state."""
@@ -29,6 +40,23 @@ class Task:
     def get_priority_score(self) -> int:
         """Return the numeric priority of this task."""
         return self.priority
+
+    def compute_weighted_score(self) -> int:
+        """Return a composite urgency score combining priority, category, and due-date status.
+
+        Formula:
+            base      = priority × 10          (range 10–50)
+            category  = _CATEGORY_WEIGHT bonus  (0–30, e.g. medication=30, feeding=20)
+            overdue   = +25 if due_date < today, else 0
+            recurring = +5 for daily, +3 for weekly, 0 for once
+
+        Higher scores surface more urgent tasks first in generate_weighted_plan().
+        """
+        base = self.priority * 10
+        category_bonus = _CATEGORY_WEIGHT.get(self.category, 0)
+        overdue_bonus = 25 if self.due_date < date.today() else 0
+        recurrence_bonus = {"daily": 5, "weekly": 3}.get(self.frequency, 0)
+        return base + category_bonus + overdue_bonus + recurrence_bonus
 
     def is_schedulable(self, available_minutes: int) -> bool:
         """Return True if this task's duration fits within the given available minutes."""
@@ -211,6 +239,29 @@ class Scheduler:
         plan = []
         remaining = self.total_minutes
         for task in sorted_tasks:
+            if task.duration_minutes <= remaining:
+                plan.append(task)
+                remaining -= task.duration_minutes
+        return plan
+
+    def generate_weighted_plan(self) -> list[Task]:
+        """Build a daily plan ranked by composite weighted score instead of raw priority.
+
+        Uses Task.compute_weighted_score() which factors in:
+          - User-assigned priority (1–5)
+          - Category urgency (medication > feeding > hygiene > walk > grooming/enrichment)
+          - Whether the task is overdue (due_date earlier than today)
+          - Recurrence frequency (daily tasks get a small boost over weekly or one-time)
+
+        This ensures, for example, that an overdue priority-3 medication outranks
+        a non-urgent priority-4 grooming session in the final plan.
+        """
+        pending = [t for t in self.owner.get_all_tasks() if not t.completed]
+        ranked = sorted(pending, key=lambda t: t.compute_weighted_score(), reverse=True)
+
+        plan = []
+        remaining = self.total_minutes
+        for task in ranked:
             if task.duration_minutes <= remaining:
                 plan.append(task)
                 remaining -= task.duration_minutes
