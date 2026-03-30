@@ -59,13 +59,22 @@ classDiagram
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+The system is built around four classes:
+
+- **Task** — the atomic unit of the app. It holds a task's name, duration, priority (1–5), category (walk/feeding/medication/etc.), and a preferred time of day. It knows whether it fits in a given time window (`is_schedulable`) and can report its priority score.
+- **Pet** — stores the pet's profile (name, breed, age, special needs) and owns the list of associated `Task` objects. It is responsible for managing task membership.
+- **Owner** — stores the owner's name, total daily minutes available, and personal preferences. It holds a reference to one `Pet` and exposes the available time for the scheduler to consume.
+- **Scheduler** — the core logic class. It takes an `Owner` (and by extension the pet's tasks), filters tasks that fit within available time, sorts by priority, builds the final daily plan, and generates a plain-English explanation of its choices.
+
+The relationship chain is: `Owner` → `Pet` → `Task`s, with `Scheduler` orchestrating the plan generation using `Owner` as its entry point.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Yes — one change was made after reviewing the design for bottlenecks.
+
+**Change:** The `Scheduler` originally held its own `tasks` list as an attribute, separate from `Pet.tasks`. This would create a sync problem: tasks added to the `Pet` after the `Scheduler` was constructed would not be visible to the plan generator.
+
+**Fix:** Removed the duplicate `tasks` attribute from `Scheduler`. Instead, `generate_plan` (and related methods) will source tasks directly from `owner.pet.get_tasks()` at call time. This ensures the scheduler always works from the current state of the pet's task list without requiring manual re-syncing.
 
 ---
 
