@@ -50,3 +50,32 @@ Phase 4 adds three new capabilities to the scheduler:
 5. Add tests to verify key behaviors.
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
+
+## Testing PawPal+
+
+### Run the test suite
+
+```bash
+python -m pytest
+```
+
+### What the tests cover
+
+| Test | What it checks |
+|------|---------------|
+| `test_mark_complete_changes_status` | `mark_complete()` flips `completed` to `True` |
+| `test_add_task_increases_pet_task_count` | `Pet.add_task()` appends to the task list |
+| `test_sort_by_time_chronological_order` | `sort_by_time()` orders slots morning → afternoon → evening → anytime |
+| `test_sort_by_time_priority_tiebreaker` | Within a time slot, higher-priority tasks appear first |
+| `test_daily_recurrence_creates_next_day_task` | Completing a daily task creates a new task due the following day |
+| `test_weekly_recurrence_creates_next_week_task` | Completing a weekly task creates a new task due the following week |
+| `test_once_task_returns_no_next_task` | One-time tasks return `None` on completion (no recurrence) |
+| `test_detect_conflicts_flags_duplicate_times` | `detect_conflicts()` returns a warning when two tasks share the same time string |
+| `test_detect_conflicts_no_false_positives` | Tasks at distinct times produce no conflict warnings |
+| `test_detect_conflicts_ignores_completed_tasks` | Completed tasks are excluded from conflict detection |
+
+### Confidence Level
+
+★★★★☆ (4/5)
+
+The core scheduling behaviors — sorting, recurrence, and conflict detection — are well-covered and all tests pass. The main gap is integration-level testing (e.g., end-to-end plan generation with a mix of constraints, and the Streamlit UI layer), which would push confidence to 5/5.
