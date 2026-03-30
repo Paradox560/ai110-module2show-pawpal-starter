@@ -32,6 +32,17 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Features
+
+| Feature | Description |
+|---|---|
+| **Priority-based scheduling** | Tasks are ranked 1–5; the daily plan fills available time starting from highest priority. |
+| **Sorting by time of day** | `Scheduler.sort_by_time()` orders tasks morning → afternoon → evening → anytime, with priority as a tiebreaker within each slot. |
+| **Flexible filtering** | `Scheduler.filter_tasks()` returns tasks filtered by completion status, pet name, or both simultaneously. |
+| **Daily & weekly recurrence** | Tasks with `frequency="daily"` or `"weekly"` auto-generate the next occurrence when marked complete, with the correct next due date. |
+| **Conflict detection** | `Scheduler.detect_conflicts()` flags any two pending tasks that share the same exact time string (e.g., `"08:00"`), returning warning messages without crashing the app. |
+| **Explanatory plan output** | `Scheduler.explain_plan()` produces a plain-English summary of what was scheduled and what was skipped, and why. |
+
 ## Smarter Scheduling
 
 Phase 4 adds three new capabilities to the scheduler:
@@ -78,4 +89,10 @@ python -m pytest
 
 ★★★★☆ (4/5)
 
-The core scheduling behaviors — sorting, recurrence, and conflict detection — are well-covered and all tests pass. The main gap is integration-level testing (e.g., end-to-end plan generation with a mix of constraints, and the Streamlit UI layer), which would push confidence to 5/5.
+The core scheduling behaviors like sorting, recurrence, and conflict detection are well-covered and all tests pass. The main gap is integration-level testing (e.g., end-to-end plan generation with a mix of constraints, and the Streamlit UI layer), which would push confidence to 5/5.
+
+## Demo
+
+![PawPal+ ](./demo1.png)
+
+![PawPal+ ](./demo2.png)
