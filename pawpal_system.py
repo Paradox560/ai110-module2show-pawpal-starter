@@ -3,6 +3,8 @@ PawPal+ Logic Layer
 Backend classes for pet care scheduling.
 """
 
+import json
+import os
 from datetime import date, timedelta
 
 # Maps preferred_time strings to sort order (morning first, anytime last)
@@ -151,6 +153,77 @@ class Owner:
             if pet.name == name:
                 return pet
         return None
+
+    def save_to_json(self, path: str = "data.json") -> None:
+        """Serialize the owner, all pets, and all tasks to a JSON file."""
+        data = {
+            "name": self.name,
+            "available_minutes": self.available_minutes,
+            "preferences": self.preferences,
+            "pets": [
+                {
+                    "name": pet.name,
+                    "breed": pet.breed,
+                    "age": pet.age,
+                    "special_needs": pet.special_needs,
+                    "tasks": [
+                        {
+                            "name": t.name,
+                            "duration_minutes": t.duration_minutes,
+                            "priority": t.priority,
+                            "category": t.category,
+                            "preferred_time": t.preferred_time,
+                            "frequency": t.frequency,
+                            "time": t.time,
+                            "due_date": t.due_date.isoformat(),
+                            "completed": t.completed,
+                        }
+                        for t in pet.get_tasks()
+                    ],
+                }
+                for pet in self.pets
+            ],
+        }
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def load_from_json(cls, path: str = "data.json") -> "Owner | None":
+        """Load an Owner (with pets and tasks) from a JSON file.
+
+        Returns None if the file does not exist.
+        """
+        if not os.path.exists(path):
+            return None
+        with open(path) as f:
+            data = json.load(f)
+        owner = cls(
+            name=data["name"],
+            available_minutes=data["available_minutes"],
+            preferences=data.get("preferences", []),
+        )
+        for pet_data in data.get("pets", []):
+            pet = Pet(
+                name=pet_data["name"],
+                breed=pet_data["breed"],
+                age=pet_data["age"],
+                special_needs=pet_data.get("special_needs", []),
+            )
+            for t_data in pet_data.get("tasks", []):
+                task = Task(
+                    name=t_data["name"],
+                    duration_minutes=t_data["duration_minutes"],
+                    priority=t_data["priority"],
+                    category=t_data["category"],
+                    preferred_time=t_data.get("preferred_time", "anytime"),
+                    frequency=t_data.get("frequency", "once"),
+                    time=t_data.get("time"),
+                    due_date=date.fromisoformat(t_data["due_date"]),
+                )
+                task.completed = t_data.get("completed", False)
+                pet.add_task(task)
+            owner.add_pet(pet)
+        return owner
 
 
 class Scheduler:

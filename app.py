@@ -7,11 +7,19 @@ st.title("🐾 PawPal+")
 # ---------------------------------------------------------------------------
 # Session state init
 # ---------------------------------------------------------------------------
-if "owner" not in st.session_state:
-    st.session_state.owner = None
+DATA_FILE = "data.json"
 
-if "pets" not in st.session_state:
-    st.session_state.pets = {}   # name -> Pet
+
+def _save():
+    """Persist current owner state to disk."""
+    if st.session_state.owner:
+        st.session_state.owner.save_to_json(DATA_FILE)
+
+
+if "owner" not in st.session_state:
+    loaded = Owner.load_from_json(DATA_FILE)
+    st.session_state.owner = loaded
+    st.session_state.pets = {p.name: p for p in loaded.pets} if loaded else {}
 
 # ---------------------------------------------------------------------------
 # Owner + pet setup
@@ -33,6 +41,7 @@ if st.button("Save Owner & Pet"):
     owner.add_pet(pet)
     st.session_state.owner = owner
     st.session_state.pets = {pet_name: pet}
+    _save()
     st.success(f"Saved! Owner: {owner_name} | Pet: {pet_name} ({breed}, age {age}) | {available_minutes} min/day")
 
 st.divider()
@@ -71,6 +80,7 @@ else:
             time=exact_time.strip() if exact_time.strip() else None,
         )
         pet.add_task(task)
+        _save()
         st.success(f"Added '{task_title}' to {selected_pet}.")
 
     # Show current tasks sorted by time of day
@@ -157,6 +167,7 @@ else:
                     if not task.completed:
                         if st.checkbox(f"{task.name} — {task.pet_name} ({task.duration_minutes} min)", key=checkbox_key):
                             next_task = scheduler.mark_task_complete(task, pet)
+                            _save()
                             if next_task:
                                 st.info(f"'{task.name}' marked done. Next occurrence scheduled for {next_task.due_date}.")
                             else:
